@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	telebot "gopkg.in/telebot.v3"
+	telebot "gopkg.in/telebot.v4"
 )
 
 var (
@@ -31,7 +31,7 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("kbot %s started:", appVersion)
+		fmt.Printf("kbot %s started", appVersion)
 		kbot, err := telebot.NewBot(telebot.Settings{
 			URL:    "",
 			Token:  Teletoken,
@@ -46,8 +46,8 @@ to quickly create a Cobra application.`,
 			payload := m.Message().Payload
 
 			switch payload {
-			case "hello":
-				err = m.Send(fmt.Sprintf("Hello, I`m Kbot %s", appVersion))
+				case "hello":
+				err = m.Send(fmt.Sprintf("Hello, I'm Kbot %s", appVersion))
 
 			}
 
