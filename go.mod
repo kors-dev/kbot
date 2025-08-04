@@ -1,6 +1,6 @@
 module github.com/kors-dev/kbot
 
-go 1.24.5
+go 1.21
 
 require (
 	github.com/spf13/cobra v1.9.1
