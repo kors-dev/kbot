@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: kors-dev
+  repository: ghcr.io/kors-dev/kbot
   tag: "v1.0.7-8c6625a"
   arch: amd64
 
