@@ -21,8 +21,8 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      dnsPolicy: None
       dnsConfig:
-        dnsPolicy: None
         nameservers:
           - 1.1.1.1
       {{- with .Values.imagePullSecrets }}
@@ -47,8 +47,11 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           volumeMounts:
-            - mountPath: /dev/mem
-            - name: dev-mem 
+            - name: dev-mem
+              mountPath: /dev/mem
+          {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           image: "{{ .Values.image.repository }}/{{ .Chart.Name }}:{{ .Values.image.tag }}-{{ .Values.image.arch | default "amd64"}}"
           env:
             - name: {{ .Values.secret.tokenName }}
