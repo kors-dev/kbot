@@ -6,7 +6,7 @@ replicaCount: 1
 
 image:
   repository: kors-dev
-  tag: "v1.0.7-018e0bd"
+  tag: "v1.0.7-8c6625a"
   arch: amd64
 
 secret:
