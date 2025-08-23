@@ -15,9 +15,9 @@ secret:
   tokenName: "TELE_TOKEN"
 
 serviceAccount:
-  create: true     
-  automount: true   
-  name: ""  
+   create: false      
+   automount: true   
+   name: "default"  
 
 service:
   type: ClusterIP
