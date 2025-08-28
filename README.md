@@ -74,7 +74,7 @@ The deployment template constructs the image as:
 
 ```mermaid
 flowchart LR
-  A[Developer push to <code>develop</code>] --> B[GitHub Actions CI/CD]
+  A[Developer push to develop] --> B[GitHub Actions CI/CD]
 
   subgraph CI[CI on GitHub Actions]
     B1[Lint & Build]
@@ -85,13 +85,13 @@ flowchart LR
   end
   B --> CI
 
-  CI --> G[Commit back to <code>develop</code>]
+  CI --> G[Commit back to develop]
 
   subgraph Git[Git repository]
     G
   end
 
-  G --> H[Argo CD (targetRevision: develop)]
+  G --> H[Argo CD (develop branch)]
   H --> I[Sync & Deploy to Kubernetes]
 
   subgraph K8s[Kubernetes cluster]
@@ -100,6 +100,7 @@ flowchart LR
   end
 
   K -.-> T[Telegram Bot ready]
+
 ```
 
 ---
