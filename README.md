@@ -83,9 +83,8 @@ flowchart LR
     B4[Update helm/values.yaml]
     B1 --> B2 --> B3 --> B4
   end
-  B --> CI
-
-  CI --> G[Commit back to develop]
+  B --> B1
+  B4 --> G[Commit back to develop]
 
   subgraph Git[Git repository]
     G
@@ -99,8 +98,7 @@ flowchart LR
     J --> K[Pod running]
   end
 
-  K -.-> T[Telegram Bot ready]
-
+  K --> T[Telegram Bot ready]
 ```
 
 ---
