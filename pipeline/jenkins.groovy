@@ -4,7 +4,7 @@ pipeline {
   options {
     timestamps()
     ansiColor('xterm')
-
+    skipDefaultCheckout(true) // щоб не було дубльованого checkout
   }
 
   parameters {
@@ -13,7 +13,8 @@ pipeline {
   }
 
   environment {
-    GITHUB_TOKEN = credentials('github') // Username with password (GitHub + PAT)
+    // Jenkins credentials: Username with password (GitHub login + PAT з write:packages)
+    GITHUB_TOKEN = credentials('github')
     REPO   = 'https://github.com/kors-dev/kbot.git'
     BRANCH = 'develop'
   }
@@ -22,43 +23,57 @@ pipeline {
 
     stage('Checkout') {
       steps {
-  
         echo 'Clone Repository'
         git branch: "${BRANCH}", url: "${REPO}"
       }
     }
 
     stage('Test') {
-        steps {
-            sh(script: 'set -euo pipefail; make test', shell: '/bin/bash')
-    }
-    }
-    stage('Build') {
-        steps {
-            script {
-                def goos = (params.OS == 'apple') ? 'darwin' : params.OS
-                sh(script: "set -euo pipefail; make build TARGETOS=${goos} TARGETARCH=${params.ARCH}", shell: '/bin/bash')
-        }
-    }
-    }
-    stage('Image') {
-        steps {
-            script {
-                def goos = (params.OS == 'apple') ? 'darwin' : params.OS
-                sh(script: "set -euo pipefail; make image TARGETOS=${goos} TARGETARCH=${params.ARCH}", shell: '/bin/bash')
-        }
-    }
-    }
-    stage('Push image') {
-        steps {
-            script {
-                def goos = (params.OS == 'apple') ? 'darwin' : params.OS
-                sh(script: "set -euo pipefail; make push TARGETOS=${goos} TARGETARCH=${params.ARCH}", shell: '/bin/bash')
-        }
-    }
-    }
-    post {
-        always { sh(script: 'docker logout || true', shell: '/bin/bash') }
+      steps {
+        echo 'Testing started'
+        sh "make test"
+      }
     }
 
+    stage('Build') {
+      steps {
+        script {
+          def goos = (params.OS == 'apple') ? 'darwin' : params.OS
+          echo "Building binary for platform ${goos} on ${params.ARCH} started"
+          sh "make build TARGETOS=${goos} TARGETARCH=${params.ARCH}"
+        }
+      }
+    }
+
+    stage('Image') {
+      steps {
+        script {
+          def goos = (params.OS == 'apple') ? 'darwin' : params.OS
+          echo "Building image for platform ${goos} on ${params.ARCH} started"
+          sh "make image TARGETOS=${goos} TARGETARCH=${params.ARCH}"
+        }
+      }
+    }
+
+    stage('Login to GHCR') {
+      steps {
+        sh 'echo "$GITHUB_TOKEN_PSW" | docker login ghcr.io -u "$GITHUB_TOKEN_USR" --password-stdin'
+      }
+    }
+
+    stage('Push image') {
+      steps {
+        script {
+          def goos = (params.OS == 'apple') ? 'darwin' : params.OS
+          sh "make push TARGETOS=${goos} TARGETARCH=${params.ARCH}"
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker logout || true'
+    }
+  }
 }
