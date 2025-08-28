@@ -9,7 +9,7 @@ pipeline {
     }
 
     environment {
-        GITHUB_TOKEN=credentials('id_ed25519_jenkins.pub')
+        GITHUB_TOKEN=credentials('github)
         REPO = 'https://github.com/kors-dev/kbot.git'
         BRANCH = 'develop'
     }
