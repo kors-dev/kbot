@@ -64,7 +64,6 @@ jobs:
           go-version: '1.22'
           cache: true
 
-      # Формуємо версію: беремо appVersion з helm/Chart.yaml + короткий SHA
       - name: Set version (from Helm appVersion + short SHA)
         id: ver
         shell: bash
@@ -73,14 +72,11 @@ jobs:
           if [ -z "$APP_VERSION" ]; then APP_VERSION=v1.0.0; fi
           SHORT_SHA=$(git rev-parse --short HEAD)
           IMAGE_TAG="${APP_VERSION}-${SHORT_SHA}"
-          echo "APP_VERSION=$APP_VERSION"   >> $GITHUB_ENV
-          echo "SHORT_SHA=$SHORT_SHA"       >> $GITHUB_ENV
-          echo "IMAGE_TAG=$IMAGE_TAG"       >> $GITHUB_ENV
-          echo "FULL_TAG=${IMAGE_TAG}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}" >> $GITHUB_ENV
-          echo "Using tag: ${IMAGE_TAG}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          FULL_TAG="${IMAGE_TAG}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}"
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG"     >> $GITHUB_ENV
+          echo "FULL_TAG=$FULL_TAG"       >> $GITHUB_ENV
+          echo "Using tag: $FULL_TAG"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -89,17 +85,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image (linux/amd64)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ghcr.io/${{ env.IMAGE_REPO }}:${{ env.FULL_TAG }}
-          build-args: |
-            APP_VERSION=${{ env.APP_VERSION }}
+      - name: Build and push Docker image
+        run: |
+          docker build \
+            --platform ${{ env.TARGETOS }}/${{ env.TARGETARCH }} \
+            -t ghcr.io/${{ env.IMAGE_REPO }}:${{ env.FULL_TAG }} \
+            --build-arg APP_VERSION=${{ env.APP_VERSION }} .
+          docker push ghcr.io/${{ env.IMAGE_REPO }}:${{ env.FULL_TAG }}
 
-      # Оновлюємо helm/values.yaml: registry/repository/tag/os/arch
       - name: Update Helm chart values
         uses: mikefarah/yq@v4.44.3
         with:
@@ -117,7 +110,5 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add helm/values.yaml
-          git commit -m "ci: bump image to ${{ env.IMAGE_TAG }}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}"
+          git commit -m "ci: bump image to ${{ env.FULL_TAG }}"
           git push
-
-      # ArgoCD нічого викликати не треба — він сам підхопить зміну з git
