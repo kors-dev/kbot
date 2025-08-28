@@ -5,7 +5,7 @@
 replicaCount: 1
 image:
   repository: kors-dev/kbot
-  tag: "1.16.0-132dd2c"
+  tag: "1.16.0-59c8042"
   arch: amd64
   registry: ghcr.io
   os: linux
