@@ -15,7 +15,7 @@ env:
   TARGETOS: linux
   CGO_ENABLED: 0
   REGISTRY: ghcr.io
-  IMAGE_REPO: ${{ github.repository_owner }}/kbot
+  IMAGE_REPO: kors-dev/kbot
 
 jobs:
   ci:
@@ -78,12 +78,12 @@ jobs:
           echo "FULL_TAG=$FULL_TAG"       >> $GITHUB_ENV
           echo "Using tag: $FULL_TAG"
 
-      # - name: Log in to GHCR
-      #   uses: docker/login-action@v3
-      #   with:
-      #     registry: ghcr.io
-      #     username: ${{ github.repository_owner }}
-      #     password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
         run: |
