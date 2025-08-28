@@ -90,7 +90,7 @@ flowchart LR
     G
   end
 
-  G --> H[Argo CD (develop branch)]
+  G --> H[Argo CD - develop branch]
   H --> I[Sync & Deploy to Kubernetes]
 
   subgraph K8s[Kubernetes cluster]
