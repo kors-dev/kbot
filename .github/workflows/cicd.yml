@@ -6,16 +6,16 @@ on:
   pull_request:
     branches: [ develop ]
 
-# permissions:
-#   contents: write    # щоб комітити зміни у helm/values.yaml
-#   packages: write    # щоб пушити образ у GHCR
+permissions:
+  contents: write    # щоб комітити зміни у helm/values.yaml
+  packages: write    # щоб пушити образ у GHCR
 
 env:
   TARGETARCH: amd64
   TARGETOS: linux
   CGO_ENABLED: 0
   REGISTRY: ghcr.io
-  IMAGE_REPO: kors-dev/kbot
+  IMAGE_REPO: ${{ github.repository_owner }}/kbot
 
 jobs:
   ci:
