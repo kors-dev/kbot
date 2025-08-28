@@ -117,3 +117,6 @@ jobs:
           git add helm/values.yaml
           git commit -m "ci: bump image to ${{ env.FULL_TAG }}"
           git push
+
+
+          
