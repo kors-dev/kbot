@@ -29,52 +29,36 @@ pipeline {
     }
 
     stage('Test') {
-      steps {
-        echo 'Testing started'
-        sh 'set -euo pipefail; make test'
-      }
+        steps {
+            sh(script: 'set -euo pipefail; make test', shell: '/bin/bash')
     }
-
+    }
     stage('Build') {
-      steps {
-        script {
-          
-          def goos = (params.OS == 'apple') ? 'darwin' : params.OS
-          echo "Building binary for platform ${goos}/${params.ARCH}"
-          sh "set -euo pipefail; make build TARGETOS=${goos} TARGETARCH=${params.ARCH}"
+        steps {
+            script {
+                def goos = (params.OS == 'apple') ? 'darwin' : params.OS
+                sh(script: "set -euo pipefail; make build TARGETOS=${goos} TARGETARCH=${params.ARCH}", shell: '/bin/bash')
         }
-      }
     }
-
+    }
     stage('Image') {
-      steps {
-        script {
-          def goos = (params.OS == 'apple') ? 'darwin' : params.OS
-          sh "set -euo pipefail; make image TARGETOS=${goos} TARGETARCH=${params.ARCH}"
+        steps {
+            script {
+                def goos = (params.OS == 'apple') ? 'darwin' : params.OS
+                sh(script: "set -euo pipefail; make image TARGETOS=${goos} TARGETARCH=${params.ARCH}", shell: '/bin/bash')
         }
-      }
     }
-
-    stage('Login to GHCR') {
-      steps {
-        // credentials уже в env: GITHUB_TOKEN_USR / GITHUB_TOKEN_PSW
-        sh 'set -euo pipefail; echo "$GITHUB_TOKEN_PSW" | docker login ghcr.io -u "$GITHUB_TOKEN_USR" --password-stdin'
-      }
     }
-
     stage('Push image') {
-      steps {
-        script {
-          def goos = (params.OS == 'apple') ? 'darwin' : params.OS
-          sh "set -euo pipefail; make push TARGETOS=${goos} TARGETARCH=${params.ARCH}"
+        steps {
+            script {
+                def goos = (params.OS == 'apple') ? 'darwin' : params.OS
+                sh(script: "set -euo pipefail; make push TARGETOS=${goos} TARGETARCH=${params.ARCH}", shell: '/bin/bash')
         }
-      }
     }
-  }
+    }
+    post {
+        always { sh(script: 'docker logout || true', shell: '/bin/bash') }
+    }
 
-  post {
-    always {
-      sh 'docker logout || true'
-    }
-  }
 }
