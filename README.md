@@ -73,7 +73,7 @@ The deployment template constructs the image as:
 ## Workflow Diagram
 
 ```mermaid
-flowchart LR
+flowchart TB
   A[Developer push to develop] --> B[GitHub Actions CI/CD]
 
   subgraph CI[CI on GitHub Actions]
