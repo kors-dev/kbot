@@ -41,7 +41,7 @@ jobs:
           args: --timeout=5m
 
       # - name: Run tests
-      #   run: make test
+      #   run: make test   
 
       - name: Build (local check)
         run: make build TARGETARCH=${{ env.TARGETARCH }} TARGETOS=${{ env.TARGETOS }}
@@ -119,4 +119,3 @@ jobs:
           git push
 
 
-          
