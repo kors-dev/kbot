@@ -1,13 +1,15 @@
 APP            := $(shell basename $(shell git remote get-url origin) | sed 's/\.git$$//')
 GIT_SHA        := $(shell git rev-parse --short HEAD)
-APP_VERSION    := $(shell awk '/^appVersion:/{print $$2}' helm/Chart.yaml 2>/dev/null)
+# Витягти appVersion без лапок з helm/Chart.yaml
+APP_VERSION    := $(shell sed -n 's/^appVersion:[[:space:]]*"\?\(.*\)"\?/\1/p' helm/Chart.yaml 2>/dev/null)
 VERSION        := $(if $(APP_VERSION),$(APP_VERSION),v0.0.0)-$(GIT_SHA)
 
-REGISTRY       ?= ghcr.io/kors-dev           
+REGISTRY       ?= ghcr.io/kors-dev
 IMAGE          := $(REGISTRY)/$(APP)
 
 TARGETOS       ?= linux
 TARGETARCH     ?= amd64
+BIN            := kbot$(if $(filter $(TARGETOS),windows),.exe,)
 
 .PHONY: format get lint test build image push clean
 
@@ -25,9 +27,9 @@ test:
 
 build: format get
 	CGO_ENABLED=0 GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) \
-	go build -v -o kbot \
+	go build -v -o $(BIN) \
 	  -ldflags "-s -w -X github.com/kors-dev/kbot/cmd.appVersion=$(VERSION)" \
-	  ./...
+	  .
 
 image:
 	docker build . \
@@ -39,4 +41,4 @@ push:
 	docker push $(IMAGE):$(VERSION)-$(TARGETOS)-$(TARGETARCH)
 
 clean:
-	rm -f kbot
+	rm -f kbot kbot.exe
