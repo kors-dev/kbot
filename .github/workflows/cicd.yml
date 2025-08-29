@@ -86,9 +86,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
 
-      - name: Check GHCR login
-        run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      # - name: Check GHCR login
+      #   run: |
+      #     echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build and push Docker image
         run: |
@@ -110,12 +110,16 @@ jobs:
               .image.arch = strenv(TARGETARCH)
             ' helm/values.yaml
 
-      - name: Commit Helm chart changes
+      - name: Commit Helm chart changes (with skip-ci)
         run: |
+          if git diff --quiet -- helm/values.yaml; then
+            echo "No changes to commit."
+            exit 0
+          fi
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add helm/values.yaml
-          git commit -m "ci: bump image to ${{ env.FULL_TAG }}"
+          git commit -m "ci: bump image to ${{ env.FULL_TAG }} [skip ci]"
           git push
 
 
