@@ -1,7 +1,7 @@
 APP            := $(shell basename $(shell git remote get-url origin) | sed 's/\.git$$//')
 GIT_SHA        := $(shell git rev-parse --short HEAD)
 # Витягти appVersion без лапок з helm/Chart.yaml
-APP_VERSION    := $(shell sed -n 's/^appVersion:[[:space:]]*"\?\(.*\)"\?/\1/p' helm/Chart.yaml 2>/dev/null)
+APP_VERSION    := $(shell git describe --tags --abbrev=0)-$(shell git rev-parse --short HEAD)
 VERSION        := $(if $(APP_VERSION),$(APP_VERSION),v0.0.0)-$(GIT_SHA)
 
 REGISTRY       ?= ghcr.io/kors-dev
