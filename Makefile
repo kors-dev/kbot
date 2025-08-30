@@ -1,8 +1,13 @@
 APP            := $(shell basename $(shell git remote get-url origin) | sed 's/\.git$$//')
-GIT_SHA        := $(shell git rev-parse --short HEAD)
+SHORT_SHA      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 # Витягти appVersion без лапок з helm/Chart.yaml
-APP_VERSION    := $(shell git describe --tags --abbrev=0)-$(shell git rev-parse --short HEAD)
-VERSION        := $(if $(APP_VERSION),$(APP_VERSION),v0.0.0)-$(GIT_SHA)
+TAG_ONLY   := $(shell \
+	( git describe --tags --abbrev=0 2>/dev/null ) \
+	|| ( git tag --sort=-creatordate | tail -n1 ) \
+	|| echo v0.0.0 )
+
+# APP_VERSION    := $(shell git describe --tags --abbrev=0)-$(shell git rev-parse --short HEAD)
+VERSION        := $(TAG_ONLY)-$(SHORT_SHA)
 
 REGISTRY       ?= ghcr.io/kors-dev
 IMAGE          := $(REGISTRY)/$(APP)
@@ -42,3 +47,9 @@ push:
 
 clean:
 	rm -f kbot kbot.exe
+
+
+print-version:
+	@echo "TAG_ONLY=$(TAG_ONLY)"
+	@echo "SHORT_SHA=$(SHORT_SHA)"
+	@echo "VERSION=$(VERSION)"
