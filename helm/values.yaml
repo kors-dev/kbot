@@ -5,10 +5,10 @@
 replicaCount: 1
 image:
   repository: kors-dev/kbot
-  tag: "1a883e5-amd64"
+  tag: "v5d8e35a"
   arch: amd64
   registry: ghcr.io
-  os: linux
+  os: ""
 secret:
   name: "kbot"
   tokenKey: "token"
