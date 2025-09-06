@@ -6,124 +6,58 @@ on:
   pull_request:
     branches: [ develop ]
 
-permissions:
-  contents: write    # щоб комітити зміни у helm/values.yaml
-  packages: write    # щоб пушити образ у GHCR
-
 env:
-  TARGETARCH: amd64
   TARGETOS: linux
-  CGO_ENABLED: 0
-  REGISTRY: ghcr.io
-  IMAGE_REPO: kors-dev/kbot
+  TARGETARCH: amd64
 
 jobs:
   ci:
     name: CI
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-          cache: true
+      - name: Run test
+        run: make test
 
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          args: --timeout=5m
-
-      # - name: Run tests
-      #   run: make test
-
-      - name: Build (local check)
-        run: make build TARGETARCH=${{ env.TARGETARCH }} TARGETOS=${{ env.TARGETOS }}
-
-  cd:
-    name: CD
-    needs: ci
-    if: github.ref == 'refs/heads/develop'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-          cache: true
-
-      # Формуємо версію: беремо appVersion з helm/Chart.yaml + короткий SHA
-      - name: Set version (from Helm appVersion + short SHA)
-        id: ver
-        shell: bash
-        run: |
-          # беремо appVersion; якщо його немає — fallback на version
-          APP_VERSION=$(awk -F': ' '/^appVersion:/{print $2}' helm/Chart.yaml | tr -d '"' || true)
-          if [ -z "$APP_VERSION" ]; then
-            APP_VERSION=$(awk -F': ' '/^version:/{print $2}' helm/Chart.yaml | tr -d '"')
-          fi
-          # гарантуємо префікс "v"
-          if [[ "$APP_VERSION" != v* ]]; then APP_VERSION="v${APP_VERSION}"; fi
-
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          IMAGE_TAG="${APP_VERSION}-${SHORT_SHA}"
-          echo "APP_VERSION=$APP_VERSION"   >> $GITHUB_ENV
-          echo "SHORT_SHA=$SHORT_SHA"       >> $GITHUB_ENV
-          echo "IMAGE_TAG=$IMAGE_TAG"       >> $GITHUB_ENV
-          echo "FULL_TAG=${IMAGE_TAG}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}" >> $GITHUB_ENV
-          echo "Using tag: ${IMAGE_TAG}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}"
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build and push Docker image (linux/amd64)
-        uses: docker/build-push-action@v6
+      - name: Build&Push
+        env:
+          APP: "kbot"
+        run: make image push
+
+  cd:
+    name: CD
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
         with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ghcr.io/${{ env.IMAGE_REPO }}:${{ env.FULL_TAG }}
-          build-args: |
-            APP_VERSION=${{ env.APP_VERSION }}
+          fetch-depth: 0
 
-      # Оновлюємо helm/values.yaml: registry/repository/tag/os/arch
-      - name: Update Helm chart values
-        uses: mikefarah/yq@v4.44.3
+      - name: Set VERSION
+        run: echo "VERSION=$(git describe --tags --abbrev=0 --always)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Update Helm values
+        uses: mikefarah/yq@master
         with:
-          cmd: |
-            yq -i '
-              .image.registry = strenv(REGISTRY) |
-              .image.repository = strenv(IMAGE_REPO) |
-              .image.tag = strenv(IMAGE_TAG) |
-              .image.os = strenv(TARGETOS) |
-              .image.arch = strenv(TARGETARCH)
-            ' helm/values.yaml
+          cmd: yq -i '.image.tag=strenv(VERSION) | .image.os=strenv(TARGETOS) | .image.arch=strenv(TARGETARCH)' helm/values.yaml
 
-      - name: Commit Helm chart changes
+      - name: Commit and push
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add helm/values.yaml
-          git commit -m "ci: bump image to ${{ env.IMAGE_TAG }}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}"
+          git commit -am "update version $VERSION"
           git push
-
-      # ArgoCD нічого викликати не треба — він сам підхопить зміну з git
