@@ -69,8 +69,14 @@ jobs:
         id: ver
         shell: bash
         run: |
-          APP_VERSION=$(grep -E '^appVersion:' helm/Chart.yaml | awk '{print $2}' | tr -d '"' || true)
-          if [ -z "$APP_VERSION" ]; then APP_VERSION=v1.0.0; fi
+          # беремо appVersion; якщо його немає — fallback на version
+          APP_VERSION=$(awk -F': ' '/^appVersion:/{print $2}' helm/Chart.yaml | tr -d '"' || true)
+          if [ -z "$APP_VERSION" ]; then
+            APP_VERSION=$(awk -F': ' '/^version:/{print $2}' helm/Chart.yaml | tr -d '"')
+          fi
+          # гарантуємо префікс "v"
+          if [[ "$APP_VERSION" != v* ]]; then APP_VERSION="v${APP_VERSION}"; fi
+
           SHORT_SHA=$(git rev-parse --short HEAD)
           IMAGE_TAG="${APP_VERSION}-${SHORT_SHA}"
           echo "APP_VERSION=$APP_VERSION"   >> $GITHUB_ENV
