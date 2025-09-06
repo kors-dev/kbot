@@ -10,6 +10,7 @@ env:
   TARGETOS: linux
   TARGETARCH: amd64
 
+# Глобальні дефолти (можна прибрати, якщо задаєш на job-рівні)
 permissions:
   contents: read
   packages: write
@@ -18,12 +19,13 @@ jobs:
   ci:
     name: CI
     runs-on: ubuntu-latest
+    # ВАЖЛИВО: не перезаписуй без потреби. Якщо треба — збережи packages: write
     permissions:
       contents: read
-      id-token: write
+      packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -37,7 +39,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build&Push
+      - name: Build & Push
         env:
           APP: "kbot"
         run: make image push
@@ -46,8 +48,11 @@ jobs:
     name: CD
     needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      # потрібно для git push
+      contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -55,13 +60,13 @@ jobs:
         run: echo "VERSION=$(git describe --tags --abbrev=0 --always)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Update Helm values
-        uses: mikefarah/yq@master
+        uses: mikefarah/yq@v4.44.3
         with:
           cmd: yq -i '.image.tag=strenv(VERSION) | .image.os=strenv(TARGETOS) | .image.arch=strenv(TARGETARCH)' helm/values.yaml
 
       - name: Commit and push
         run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git commit -am "update version $VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "[skip ci] update version $VERSION" || echo "No changes"
           git push
