@@ -1,102 +1,123 @@
-name: cicd
+name: KBOT-CICD
 
 on:
   push:
     branches: [ develop ]
-    tags:     [ 'v*' ]
+  pull_request:
+    branches: [ develop ]
 
 permissions:
-  contents: write
-  packages: write
+  contents: write    # щоб комітити зміни у helm/values.yaml
+  packages: write    # щоб пушити образ у GHCR
 
 env:
+  TARGETARCH: amd64
+  TARGETOS: linux
+  CGO_ENABLED: 0
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/kbot
+  IMAGE_REPO: kors-dev/kbot
 
 jobs:
-  build-deploy:
+  ci:
+    name: CI
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [ amd64 ]   # за потреби додай 'arm64'
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
 
-      - name: Set up Buildx
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+      # - name: Run tests
+      #   run: make test
+
+      - name: Build (local check)
+        run: make build TARGETARCH=${{ env.TARGETARCH }} TARGETOS=${{ env.TARGETOS }}
+
+  cd:
+    name: CD
+    needs: ci
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      # Формуємо версію: беремо appVersion з helm/Chart.yaml + короткий SHA
+      - name: Set version (from Helm appVersion + short SHA)
+        id: ver
+        shell: bash
+        run: |
+          APP_VERSION=$(grep -E '^appVersion:' helm/Chart.yaml | awk '{print $2}' | tr -d '"' || true)
+          if [ -z "$APP_VERSION" ]; then APP_VERSION=v1.0.0; fi
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          IMAGE_TAG="${APP_VERSION}-${SHORT_SHA}"
+          echo "APP_VERSION=$APP_VERSION"   >> $GITHUB_ENV
+          echo "SHORT_SHA=$SHORT_SHA"       >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG"       >> $GITHUB_ENV
+          echo "FULL_TAG=${IMAGE_TAG}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}" >> $GITHUB_ENV
+          echo "Using tag: ${IMAGE_TAG}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}"
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to GHCR
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install yq & helm
-        run: |
-          curl -sL https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 -o /usr/local/bin/yq
-          chmod +x /usr/local/bin/yq
-          curl -sL https://get.helm.sh/helm-v3.15.3-linux-amd64.tar.gz | tar zx
-          sudo mv linux-amd64/helm /usr/local/bin/helm
-
-      # === Обчислюємо версії/теги в єдиному форматі ===
-      - name: Compute tags
-        id: meta
-        shell: bash
-        run: |
-          SHORT_SHA="$(git rev-parse --short HEAD)"
-          BASE_VER="$(yq -r '.version' helm/Chart.yaml)"  # semver з Chart.yaml (формат файлу не змінюємо)
-
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            # push по тегу vX.Y.Z
-            GIT_TAG="${GITHUB_REF_NAME}"            # напр. v2.2.2
-            BASE_VER="${GIT_TAG#v}"                 # 2.2.2
-          fi
-
-          FULL_TAG="v${BASE_VER}-${SHORT_SHA}-linux-${{ matrix.arch }}"
-          echo "BASE_VER=$BASE_VER"     >> $GITHUB_OUTPUT
-          echo "SHORT_SHA=$SHORT_SHA"   >> $GITHUB_OUTPUT
-          echo "FULL_TAG=$FULL_TAG"     >> $GITHUB_OUTPUT
-
-      # === Будуємо та публікуємо образ у форматі vX.Y.Z-<sha>-linux-<arch> ===
-      - name: Build & Push image (${{ matrix.arch }})
+      - name: Build and push Docker image (linux/amd64)
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64
           push: true
-          platforms: linux/${{ matrix.arch }}
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.FULL_TAG }}
+          tags: ghcr.io/${{ env.IMAGE_REPO }}:${{ env.FULL_TAG }}
+          build-args: |
+            APP_VERSION=${{ env.APP_VERSION }}
 
-      # === Оновлюємо тільки значення у values.yaml (схему/формат не чіпаємо) ===
-      # chart сам збирає імідж як: {{ registry }}/{{ repository }}:{{ tag }}-{{ os }}-{{ arch }}
-      - name: Bump helm/values.yaml (no schema changes)
-        run: |
-          yq -i '.image.registry   = "ghcr.io"'                                         helm/values.yaml
-          yq -i '.image.repository = "${{ env.IMAGE_NAME }}"'                           helm/values.yaml
-          yq -i '.image.tag        = "v${{ steps.meta.outputs.BASE_VER }}-${{ steps.meta.outputs.SHORT_SHA }}"' helm/values.yaml
-          yq -i '.image.os         = "linux"'                                          helm/values.yaml
-          yq -i '.image.arch       = "${{ matrix.arch }}"'                              helm/values.yaml
-
-      - name: Commit values.yaml bump (develop only)
-        if: github.ref == 'refs/heads/develop'
-        uses: stefanzweifel/git-auto-commit-action@v5
+      # Оновлюємо helm/values.yaml: registry/repository/tag/os/arch
+      - name: Update Helm chart values
+        uses: mikefarah/yq@v4.44.3
         with:
-          commit_message: "ci: bump image to ${{ steps.meta.outputs.FULL_TAG }}"
-          branch: develop
+          cmd: |
+            yq -i '
+              .image.registry = strenv(REGISTRY) |
+              .image.repository = strenv(IMAGE_REPO) |
+              .image.tag = strenv(IMAGE_TAG) |
+              .image.os = strenv(TARGETOS) |
+              .image.arch = strenv(TARGETARCH)
+            ' helm/values.yaml
 
-      # === Реліз: пакуємо та пушимо Helm-чарт в OCI (формат Chart.yaml не змінюємо) ===
-      - name: Package & Push Helm chart (release only)
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          BASE_VER: ${{ steps.meta.outputs.BASE_VER }}
-          APP_VER:  ${{ steps.meta.outputs.FULL_TAG }}
+      - name: Commit Helm chart changes
         run: |
-          # пакуємо чарт з потрібними версіями через флаги (файли не редагуємо)
-          helm package helm --version "${BASE_VER}" --app-version "${APP_VER}"
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-          helm push "helm-${BASE_VER}.tgz" oci://ghcr.io/${{ github.repository_owner }}/charts
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add helm/values.yaml
+          git commit -m "ci: bump image to ${{ env.IMAGE_TAG }}-${{ env.TARGETOS }}-${{ env.TARGETARCH }}"
+          git push
+
+      # ArgoCD нічого викликати не треба — він сам підхопить зміну з git
