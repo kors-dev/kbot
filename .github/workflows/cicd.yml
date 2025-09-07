@@ -71,7 +71,8 @@ jobs:
         with:
           cmd: |
             yq -i '
-              .image.repository = "ghcr.io/kors-dev/kbot" |
+              .image.repository = "kors-dev/kbot" |
+              .registry = "ghcr.io" |
               .image.tag = strenv(VERSION) |
               .image.os = strenv(TARGETOS) |
               .image.arch = strenv(TARGETARCH)
