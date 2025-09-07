@@ -4,7 +4,7 @@
 
 replicaCount: 1
 image:
-  repository: ghcr.io/kors-dev/kbot
+  repository: kors-dev/kbot
   tag: "v2.2.5"
   arch: amd64
   registry: ghcr.io
@@ -24,3 +24,4 @@ service:
   annotations: {}
 securityContext:
   privileged: true
+registry: ghcr.io
