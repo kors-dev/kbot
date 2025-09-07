@@ -64,12 +64,19 @@ jobs:
           fetch-depth: 0
 
       - name: Set VERSION
-        run: echo "VERSION=$(git describe --tags --abbrev=0 --always)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        run: echo "VERSION=$(git describe --tags --abbrev=0 --always)" >> $GITHUB_ENV
 
       - name: Update Helm values
         uses: mikefarah/yq@v4.44.3
         with:
-          cmd: yq -i '.image.tag=strenv(VERSION) | .image.os=strenv(TARGETOS) | .image.arch=strenv(TARGETARCH)' helm/values.yaml
+          cmd: |
+            yq -i '
+              .image.repository = "ghcr.io/kors-dev/kbot" |
+              .image.tag = strenv(VERSION) |
+              .image.os = strenv(TARGETOS) |
+              .image.arch = strenv(TARGETARCH)
+            ' helm/values.yaml
+
 
       - name: Commit and push
         run: |
