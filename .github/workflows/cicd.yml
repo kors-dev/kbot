@@ -2,9 +2,9 @@ name: KBOT-CICD
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ develop,kbot-src ]
   pull_request:
-    branches: [ develop ]
+    branches: [ develop,kbot-src ]
 
 env:
   TARGETOS: linux
