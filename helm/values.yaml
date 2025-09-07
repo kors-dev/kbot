@@ -4,8 +4,8 @@
 
 replicaCount: 1
 image:
-  repository: ghcr.io/kors-dev/kbot
-  tag: "v2.2.4"
+  repository: kors-dev/kbot
+  tag: "v2.2.5"
   arch: amd64
   registry: ghcr.io
   os: "linux"
